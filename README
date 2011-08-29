@@ -4,7 +4,7 @@ pgbackup is a simple backup manager for postgresql
 
 how to use ?
 
-1 - clone this git repositorie:
+1 - clone this git repo:
 $ cd ~
 $ git clone git@github.com:lucasdavila/pgbackup.git
 $ cd pgbackup
