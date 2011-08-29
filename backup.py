@@ -54,7 +54,7 @@ class Backup:
         raise NotImplementedError
 
     def _get_args_helpers(self):
-        return dict(now = strftime("%H%M%S-%Y%m%d"))
+        return dict(now = strftime("%H-%M-%S_%Y-%m-%d"))
 
 
 class PgBackup(Backup):
