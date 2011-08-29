@@ -1,1 +1,1 @@
-/usr/bin/pg_dump --host localhost --port 5432 --username "postgres" --format custom --blobs --verbose --file "/home/lucasdavila/backups/ieducar-%(now)s.backup" postgres 
+/usr/bin/pg_dump --host localhost --port 5432 --username "postgres" --format custom --blobs --verbose --file "/home/lucasdavila/backups/postgres-%(now)s.backup" postgres 
