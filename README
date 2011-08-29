@@ -1,0 +1,23 @@
+pgbackup is a simple backup manager for postgresql
+
+-
+
+how to use ?
+
+1 - clone this git repositorie:
+$ cd ~
+$ git clone git@github.com:lucasdavila/pgbackup.git
+$ cd pgbackup
+
+2 - create your schedules in schedules folder:
+$ echo 'put your backup command here' >> schedules/my_schedule_name
+
+ex:
+
+echo '/usr/bin/pg_dump --host localhost --port 5432 --username "postgres" --format custom --blobs --verbose --file "/home/lucasdavila/backups/my_file_backup_name-%(now)s.backup" my_db_name' >> schedules/my_super_schedule
+
+3 - create your managers in managers folder:
+#TODO
+
+4 - add a crontab
+#TODO
