@@ -13,35 +13,36 @@ class Backup:
     
     def _load_schedule(self, name):
 
-        def get_manager_info(line_manager):
-            info = dict(name = '', args = '')
-
-            infos = line_manager.split('#')
-            if len(infos) < 1:
-                print "        failed on load manager %s :("%os.path.basename(s)
-                return info
-            elif len(line_manager) > 1:
-                info['args'] = infos[1].strip()
-
-            info['name'] = infos[0].strip()
-            return info
-
         path = os.path.join(self.paths['schedules'], name)
+        expected_args = ('command', 'manager', 'storage_path')
         lines = open(path).readlines()
-        if len(lines) > 1:
-            print '    loaded %s'%os.path.basename(name)
+        args = {}
+        manager = None
+        
+        for line in lines:
+            for key in expected_args:
+                if line.startswith(key):
+                    args[key] = line.split(key)[1].lstrip()
+                elif key not in args:
+                    args[key] = ''
+
+        if args['command']:
+            print '    loaded schedule %s with args %s'%(os.path.basename(name), args)
+
+            if args['manager']:
+                arg_manager = args['manager'].split()
+                manager_name = arg_manager[0]
+                manager_args = arg_manager[1:]
+
+                if manager_name:
+                    manager = self._get_manager_by_name(manager_name, manager_args)
+
         elif len(lines) > 0:
-            print '    loaded %s (without manager)'%os.path.basename(name)
+            print '    failed on load schedule %s (oops! where is my backup command ?)'%os.path.basename(name)
         else:
-            print '    failed on load %s (oops! schedule is empty)'%os.path.basename(name)
+            print "    failed on load schedule %s (oops! i'm empty ?)"%os.path.basename(name)
 
-        if len(lines) > 1:
-            manager_info = get_manager_info(lines[1])      
-            manager = self._get_manager_by_name(manager_info['name'], manager_info['args']) if manager_info['name'] else None
-        else:
-            manager = None
-
-        return dict(name = name, args = lines[0].strip(), manager = manager)
+        return dict(name = name, command = args['command'], manager = manager, storage_path = args['storage_path'])
 
     def _get_manager_by_name(self, name, args):
       return "#TODO _get_manager (%s, %s)"%(name, args)
@@ -50,21 +51,36 @@ class Backup:
     def backup(self, name):
         return self._backup(schedule = self._load_schedule(name))
 
-    def _backup(self, schedule):
-        raise NotImplementedError
-
-    def _get_args_helpers(self):
-        return dict(now = strftime("%H-%M-%S_%Y-%m-%d"))
-
-
-class PgBackup(Backup):
 
     def _backup(self, schedule):
-        print '\nrunning backup %s with args "%s"\n'%(schedule['name'], schedule['args'])
-        args = shlex.split(schedule['args']%self._get_args_helpers())
+
+        if not schedule.get('command', ''):
+            print '    * backup of schedule "%s" aborted, I need a argument called "command" to backup it duuu :P'%schedule.get('name', '')
+            return False
+
+        args_helpers = self._get_args_helpers(schedule = schedule)
+        args = shlex.split(schedule['command']%args_helpers)
+        self._create_dir_if_not_exists(args_helpers['storage_path'])
+
         result = subprocess.Popen(args).communicate()
         ##return subprocess.check_output(args, stderr = subprocess.STDOUT)
         return result
 
-b = PgBackup()
-b.backup('backup_name')
+
+    def _get_args_helpers(self, schedule):
+        args = {
+            'now' : strftime("%H-%M-%S_%Y-%m-%d"),
+            'storage_path' : schedule.get('storage_path', '').strip()
+        }
+
+        args.update({'file' : os.path.join(args['storage_path'], '%s_%s'%(schedule.get('name', ''), args['now']))})
+        return args
+
+
+    def _create_dir_if_not_exists(self, path):
+        if not os.path.exists(path):
+            return os.makedirs(path)
+        return True
+
+if __name__ == '__main__':
+    print "Oops, you called me but I'm a lazy script, try to call my friend pg_bakup.py"

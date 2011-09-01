@@ -14,7 +14,7 @@ $ echo 'put your backup command here' >> schedules/my_schedule_name
 
 ex:
 
-echo '/usr/bin/pg_dump --host localhost --port 5432 --username "postgres" --format custom --blobs --verbose --file "/home/lucasdavila/backups/my_file_backup_name-%(now)s.backup" my_db_name' >> schedules/my_super_schedule
+$ echo '/usr/bin/pg_dump --host localhost --port 5432 --username "postgres" --format custom --blobs --verbose --file "/home/lucasdavila/backups/my_file_backup_name-%(now)s.backup" my_db_name' >> schedules/my_super_schedule
 
 3 - create your managers in managers folder:
 #TODO
