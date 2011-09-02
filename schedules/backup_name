@@ -1,5 +1,5 @@
 command /usr/bin/pg_dump --host localhost --port 5432 --username "postgres" --format custom --blobs --verbose --file "%(file)s" postgres 
-manager
+manager local_manager
 storage_path /home/lucasdavila/pg_backups
 
 ############################### readme ###############################

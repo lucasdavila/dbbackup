@@ -1,0 +1,28 @@
+{
+    "on_fail": {
+        "commands": [
+            ""
+        ], 
+
+        "send_emails_to": [
+            "mail1@a.com.br mail2@b.com.br --assunto #todo --body #todo", 
+            "mail1@a.com.br mail2@b.com.br --assunto #todo --body #todo"
+        ]
+    }, 
+
+    "on_success": {
+        "commands": [
+            "mkdir -p /home/lucasdavila/pgbackups/",
+            "cp %(file)s /home/lucasdavila/pgbackups",
+            "echo 'local file info:'",
+            "ls -l %(file)s",
+            "echo 'size transfered info:'",
+            "ls -l /home/lucasdavila/pgbackups/%(file_basename)s"
+        ], 
+
+        "send_emails_to": [
+            "mail1@a.com.br mail2@b.com.br --assunto #todo --body #todo", 
+            "mail1@a.com.br mail2@b.com.br --assunto #todo --body #todo"
+        ]
+    }
+}
