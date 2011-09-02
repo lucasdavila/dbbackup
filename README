@@ -10,14 +10,44 @@ $ git clone git@github.com:lucasdavila/pgbackup.git
 $ cd pgbackup
 
 2 - create your schedules in schedules folder:
-$ echo 'put your backup command here' >> schedules/my_schedule_name
+ex, in /schedules/my_schedule_name: 
 
-ex:
+command /usr/bin/pg_dump --host localhost --port 5432 --username "postgres" --format custom --blobs --verbose --file "%(file)s" postgres 
+manager my_super_manager_name
+storage_path /home/lucasdavila/pg_backups
 
-$ echo '/usr/bin/pg_dump --host localhost --port 5432 --username "postgres" --format custom --blobs --verbose --file "/home/lucasdavila/backups/my_file_backup_name-%(now)s.backup" my_db_name' >> schedules/my_super_schedule
+3 - create your managers in managers folder using json notation (using the same name informed in schedules):
+ex, in /managers/my_super_manager_name: 
+{
+    "on_fail": {
+        "commands": [
+            ""
+        ], 
 
-3 - create your managers in managers folder:
-#TODO
+        "send_emails_to": [
+            "myadmin_email@server.com.br mail2@otherserver.com --subject Oops! fail... --body blablabla", 
+            "mail1@a.com.br mail2@b.com.br --subject Oops! fail... --body blablabla..."
+        ]
+    }, 
+
+    "on_success": {
+        "commands": [
+            "ssh lucasdavila@192.168.0.116 mkdir -p /home/lucasdavila/pgbackups/",
+            "scp %(file)s lucasdavila@192.168.0.116:/home/lucasdavila/pgbackups",
+            "echo 'size local info: '",
+            "ls -l %(file)s",
+            "echo 'size transfered info: '",
+            "ssh lucasdavila@192.168.0.116 ls -l /home/lucasdavila/pgbackups/%(file_basename)s"s
+        ], 
+
+        "send_emails_to": [
+            "mail1@a.com.br mail2@b.com.br --subject success :) --body the schedule...", 
+            "mail1@a.com.br mail2@b.com.br --subject duu :) --body blablabla"
+        ]
+    }
+}
 
 4 - add a crontab
 #TODO
+
+to run this scripts just execute in terminal $ /path/to/pgbackup/pg_backup.py my_schedule_name my_schedule2_name

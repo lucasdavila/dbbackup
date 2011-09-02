@@ -5,8 +5,8 @@
         ], 
 
         "send_emails_to": [
-            "mail1@a.com.br mail2@b.com.br --assunto abc --body asasas", 
-            "mail1@a.com.br mail2@b.com.br --assunto abc --body asasas"
+            "mail1@a.com.br mail2@b.com.br --subject abc --body asasas", 
+            "mail1@a.com.br mail2@b.com.br --subject abc --body asasas"
         ]
     }, 
 
@@ -21,8 +21,8 @@
         ], 
 
         "send_emails_to": [
-            "mail1@a.com.br mail2@b.com.br --assunto abc --body asasas", 
-            "mail1@a.com.br mail2@b.com.br --assunto abc --body asasas"
+            "mail1@a.com.br mail2@b.com.br --subject abc --body asasas", 
+            "mail1@a.com.br mail2@b.com.br --subject abc --body asasas"
         ]
     }
 }
