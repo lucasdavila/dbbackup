@@ -50,4 +50,4 @@ ex, in /managers/my_super_manager_name:
 4 - add a crontab
 #TODO
 
-to run this scripts just execute in terminal $ /path/to/pgbackup/pg_backup.py my_schedule_name my_schedule2_name
+Note: to test the backup manually just run in terminal $ /path/to/pgbackup/pg_backup.py my_schedule_name my_other_schedule
