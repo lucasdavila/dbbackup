@@ -6,7 +6,7 @@ pgbackup is a simple backup manager for postgresql
 
 1 - clone this git repo:
 $ cd ~
-$ git clone git@github.com:lucasdavila/pgbackup.git
+$ git clone git://github.com/lucasdavila/pgbackup.git
 $ cd pgbackup
 
 2 - create your schedules in schedules folder:
