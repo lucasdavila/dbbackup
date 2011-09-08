@@ -51,7 +51,7 @@ ex, in /managers/my_super_manager_name:
 $ crontab -e
 15 13 * * * python /home/lucasdavila/projects/python/pgbackup/backup.py postgresql my_schedule_name my_other_schedule
 
-5 - now your backup service it's working :)
+yep :) now your backup service is working.
 
 #todo
 - implement manager
