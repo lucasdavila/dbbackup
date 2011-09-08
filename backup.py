@@ -164,4 +164,38 @@ class Backup:
         return True
 
 if __name__ == '__main__':
-    print "Oops, you called me but I'm a lazy script, try to call my friend pg_bakup.py"
+    import sys
+    args_description = (
+        ('postgresql', 'realiza backup de uma base dados postgresql'),
+        ('help', 'lista  os comandos disponiveis'), 
+        ('list', 'lista schedules e managers disponiveis conforme tipo informado')
+    )
+    expected_args = ('postgresql', 'list', 'help')
+
+    def print_help():
+        print 'Usage: backup.py <command>'
+        print '\nCommandos disponiveis:'
+        for a in args_description: 
+            print '    %s - %s'%(a[0], a[1])
+
+    def backup(args):
+        if len(args) < 2:
+            print 'Pass the name of one or more schedules'
+        b = Backup()
+        for a in args[1:]:
+            b.backup(a)
+
+    def list_schelules_and_managers():
+        raise NotImplementedError
+
+    if len(sys.argv) < 2:
+        print_help()
+    elif sys.argv[1] not in expected_args:
+        print 'Oops!, invalid command "%s"\n'%sys.argv[1]
+        print_help()
+    elif sys.argv[1] == 'help':
+        print_help()
+    elif sys.argv[1] == 'list':
+        list_schelules_and_managers()
+    elif sys.argv[1] == 'postgresql':
+        backup(sys.argv[1:])

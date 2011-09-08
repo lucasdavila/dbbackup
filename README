@@ -2,7 +2,7 @@ pgbackup is a simple backup manager for postgresql
 
 -
 
-how to use ?
+#how to use ?
 
 1 - clone this git repo:
 $ cd ~
@@ -47,7 +47,13 @@ ex, in /managers/my_super_manager_name:
     }
 }
 
-4 - add a crontab
-#TODO
+4 - add a crontab:
+$ crontab -e
+15 13 * * * python /home/lucasdavila/projects/python/pgbackup/backup.py postgresql my_schedule_name my_other_schedule
+
+5 - now your backup service it's working :)
+
+#todo
+- implement manager
 
 Note: to test the backup manually just run in terminal $ /path/to/pgbackup/pg_backup.py my_schedule_name my_other_schedule
