@@ -1,9 +1,9 @@
-command /usr/bin/pg_dump --host localhost --port 5432 --username "postgres" --format custom --blobs --verbose --file "%(file)s" postgres 
-manager local_manager
+command /usr/bin/pg_dump --host localhost --port 5432 --username "postgres" --format custom --blobs --verbose --file "%(file)s" postgres
+
 storage_path /home/lucasdavila/pg_backups
 
-############################### readme ###############################
-#TODO
+manager local_manager
 
-example of command to backup a postgres database:
-/usr/bin/pg_dump --host localhost --port 5432 --username "postgres" --format custom --blobs --verbose --file "/home/lucasdavila/backups/postgres-%(now)s.backup" postgres 
+aws_s3_credential aws_s3_credential
+aws_s3_bucket_name your-bucket-name
+aws_s3_storage_key your/remote/path/to/upload
