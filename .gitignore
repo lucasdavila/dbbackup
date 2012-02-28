@@ -2,3 +2,5 @@
 *.bak
 *.1
 *.goutputstream*
+*.~
+*~
