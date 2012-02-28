@@ -1,59 +1,35 @@
-pgbackup is a simple backup manager for postgresql
+pgbackup is a simple backup manager for postgresql that allows easy uploading to [Amazon web services S3](http://aws.amazon.com/s3/).
 
--
+# Step by step to use
 
-#how to use ?
-
-1 - clone this git repo:
-$ cd ~
-$ git clone git://github.com/lucasdavila/pgbackup.git
-$ cd pgbackup
-
-2 - create your schedules in schedules folder:
-ex, in /schedules/my_schedule_name: 
-
-command /usr/bin/pg_dump --host localhost --port 5432 --username "postgres" --format custom --blobs --verbose --file "%(file)s" postgres 
-manager my_super_manager_name
-storage_path /home/lucasdavila/pg_backups
-
-3 - create your managers in managers folder using json notation (using the same name informed in schedules):
-ex, in /managers/my_super_manager_name: 
-{
-    "on_fail": {
-        "commands": [
-            ""
-        ], 
-
-        "send_emails_to": [
-            "myadmin_email@server.com.br mail2@otherserver.com --subject Oops! fail... --body blablabla", 
-            "mail1@a.com.br mail2@b.com.br --subject Oops! fail... --body blablabla..."
-        ]
-    }, 
-
-    "on_success": {
-        "commands": [
-            "ssh lucasdavila@192.168.0.116 mkdir -p /home/lucasdavila/pgbackups/",
-            "scp %(file)s lucasdavila@192.168.0.116:/home/lucasdavila/pgbackups",
-            "echo 'size local info: '",
-            "ls -l %(file)s",
-            "echo 'size transfered info: '",
-            "ssh lucasdavila@192.168.0.116 ls -l /home/lucasdavila/pgbackups/%(file_basename)s"s
-        ], 
-
-        "send_emails_to": [
-            "mail1@a.com.br mail2@b.com.br --subject success :) --body the schedule...", 
-            "mail1@a.com.br mail2@b.com.br --subject duu :) --body blablabla"
-        ]
-    }
-}
-
-4 - add a crontab:
-$ crontab -e
-15 13 * * * python /home/lucasdavila/projects/python/pgbackup/backup.py postgresql my_schedule_name my_other_schedule
+**1. clone this repo:**  
+```$ cd ~  
+$ git clone git://github.com/lucasdavila/pgbackup.git  
+$ cd pgbackup```  
+  
+  
+**2. create your schedules in _/schedules/your_schedule_file_name_:**  
+```command /usr/bin/pg_dump --host localhost --port 5432 --username "postgres" --format custom --blobs --verbose --file "%(file)s" data-base-name```    
+```manager my_super_manager_name```  
+```storage_path /home/lucasdavila/pg_backups```  
+```aws_s3_credential aws_s3_credential```  
+```aws_s3_bucket_name your-bucket-name```  
+```aws_s3_storage_key your/remote/path/to/upload```  
+  
+  
+**3. define your aws credentials in _/schedules/aws_s3_credential_:**  
+```aws_s3_access_key your-access-key```  
+```aws_s3_secret_key your-secret-key```  
+Remember: Your keys are private. DON'T add this into your version control system.
+  
+  
+**4. add a crontab:**  
+```$ crontab -e```  
+```15 13 * * * python /home/lucasdavila/projects/python/pgbackup/backup.py postgresql your_schedule_file_name your_other_schedule```  
 
 yep :) now your backup service is working.
 
-#todo
-- implement manager
+### todo
+- replace manager by email options in schedule files.
 
-Note: to test the backup manually just run in terminal $ /path/to/pgbackup/pg_backup.py my_schedule_name my_other_schedule
+Note: to test the backup manually just run this command ```$ python /path/to/pgbackup/pg_backup.py my_schedule_name my_other_schedule```
