@@ -4,4 +4,4 @@
 *.goutputstream*
 *.~
 *~
-/credentials
+/credentials/*
