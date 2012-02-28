@@ -3,20 +3,19 @@ pgbackup is a simple backup manager for postgresql that allows easy uploading to
 # Step by step
 
 **1. clone this repo:**  
-```$ cd ~  
-$ git clone git://github.com/lucasdavila/pgbackup.git  
-$ cd pgbackup```
+```$ cd ~```  
+```$ git clone git://github.com/lucasdavila/pgbackup.git```  
+```$ cd pgbackup```  
 
 
 **2. Install pip and requiriments:**  
-```$ sudo apt-get install python-dev build-essential python-pip```    
-```$ sudo sudo pip install --upgrade pip```    
-```$ sudo pip install -r requiriments.txt```    
+```$ sudo apt-get install python-dev build-essential python-pip```  
+```$ sudo sudo pip install --upgrade pip```  
+```$ sudo pip install -r requiriments.txt```  
     
   
 **3. create your schedules in _/schedules/your_schedule_file_name_:**  
-```command /usr/bin/pg_dump --host localhost --port 5432 --username "postgres" --format custom --blobs --verbose --file "%(file)s" data-base-name```    
-```manager my_super_manager_name```  
+```command /usr/bin/pg_dump --host localhost --port 5432 --username "postgres" --format custom --blobs --verbose --file "%(file)s" data-base-name```  
 ```storage_path /home/lucasdavila/pg_backups```  
 ```aws_s3_credential aws_s3_credential```  
 ```aws_s3_bucket_name your-bucket-name```  
