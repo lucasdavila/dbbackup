@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*- 
+# -*- coding: utf-8 -*-
 """
 Copyright (c) 2011 Lucas D'Avila - email <lucassdvl@gmail.com> / twitter @lucadavila
 
@@ -20,19 +20,94 @@ along with pgbackup.  If not, see <http://www.gnu.org/licenses/>.
 import os.path, shlex, subprocess, json
 from time import strftime
 
-class Manager:
+class AmazonWebServicesS3:
+    def __init__(self, credentials = {}):
+        self.access_key = credentials.get('aws_s3_access_key')
+        self.secret_key = credentials.get('aws_s3_secret_key')
+
+
+    def upload(self, schedule):
+        from boto.s3.connection import S3Connection
+        from boto.s3.key import Key
+
+        local_file_path  = schedule['args_helpers']['file']
+        remote_file_path = os.path.join(schedule['aws_s3_storage_key'], os.path.basename(local_file_path))
+
+        print "\n* Uploading %s to aws s3 bucket: '%s', key: '%s'."%(local_file_path, schedule['aws_s3_bucket_name'], remote_file_path)
+        connection = S3Connection(self.access_key, self.secret_key)
+        bucket = connection.get_bucket(schedule['aws_s3_bucket_name'])
+
+        remote_file = Key(bucket)
+        remote_file.key = remote_file_path
+        remote_file.set_contents_from_filename(local_file_path)
+        print "\n    Yep, file uploaded."
+        return True
+
+
+class Settings:
+
+    def __init__(self, settings_type):
+          self.settings_type = settings_type
+
+          self.paths = {
+              'root' : os.path.join(os.path.dirname(os.path.abspath(__file__)), self.settings_type)
+          }
+
+
+    def validates_existence_of(self, name):
+        if not os.path.exists(self.get_path_for(name)):
+            print '    %s not exists in path "%s" :('%(self.settings_type, name)
+            return False
+        return True
+
+
+    def get_path_for(self, name):
+        return os.path.join(self.paths['root'], name)
+
+
+    def load(self):
+        raise NotImplementedError
+
+
+class Credential(Settings):
 
     def __init__(self):
-        self.paths = {
-            'managers' : os.path.join(os.path.dirname(os.path.abspath(__file__)), 'managers')
-        }
+        Settings.__init__(self, 'credentials')
+
+
+    def load(self, name):
+        return self._load(name) if self.validates_existence_of(name) else False
+
+
+    def _load(self, name):
+        print "\n* Loaded credential %s"%name
+        expected_args = ('aws_s3_access_key', 'aws_s3_secret_key')
+
+        lines = open(self.get_path_for(name)).readlines()
+        args = {}
+
+        for line in lines:
+            for key in expected_args:
+                if line.startswith(key):
+                    args[key] = line.split(key, 1)[1].strip()
+                elif key not in args:
+                    args[key] = ''
+
+        return args
+
+
+class Manager(Settings):
+
+    def __init__(self):
+        Settings.__init__(self, 'managers')
+
 
     def execute_commands(self, commands, schedule):
         def now():
             return strftime("%H:%M:%S-%Y-%m-%d")
-        logs = ''        
+        logs = ''
         logs += '\n* Started commands (at %s):'%now()
-        logs += '\n    %s\n\nresults:\n'%('\n    '.join(commands)%schedule['args_helpers'])
+        logs += '\n    %s\n\n    results:\n'%('\n    '.join(commands)%schedule['args_helpers'])
         for command in commands:
             args = (command%schedule['args_helpers']).encode('utf8')
             #subprocess.Popen(shlex.split(args)).communicate()
@@ -41,12 +116,12 @@ class Manager:
                 logs += ('    %s'%result) if result else ''
             except Exception as e:
                 logs+= '\n** Oops! errors ocurred on command "%s":\n        python traceback: %s\n        OS traceback: %s\n'%(args, e, e.output if 'output' in e.__dict__ else '')
-        logs += 'Finalized commands at %s\n\n'%now()
+        logs += '\n    Finalized commands at %s'%now()
 
         print logs
 
     def send_emails(self, emails, commands, commands_logs):
-        print '#TODO implementar metodo send_emails: %s'%emails
+        print '\n* #TODO implementar metodo send_emails: %s'%emails
 
 
     def on_success(self, schedule):
@@ -58,24 +133,22 @@ class Manager:
         raise NotImplementedError
 
 
-    def load_manager(self, name, args):
-
-        path = os.path.join(self.paths['managers'], name)
-        if not os.path.exists(path):
-            print '    failed on load manager "%s" file not exists :('%name
+    def load(self, name):
+        if self.validates_existence_of(name):
+            self.events = json.loads(open(self.get_path_for(name)).read())
+            return self
+        else:
             return False
 
-        self.events = json.loads(open(path).read())
-        return self    
-
+#TODO herdar classe Settings
 class Backup:
 
     def __init__(self):
         self.paths = {
             'schedules' : os.path.join(os.path.dirname(os.path.abspath(__file__)), 'schedules'),
-        } 
+        }
 
-    
+
     def _load_schedule(self, name):
 
         path = os.path.join(self.paths['schedules'], name)
@@ -83,21 +156,21 @@ class Backup:
             print '    failed on load schedule "%s" file not exists :('%name
             return False
 
-        expected_args = ('command', 'manager', 'storage_path')
+        expected_args = ('command', 'manager', 'storage_path', 'aws_s3_credential', 'aws_s3_bucket_name', 'aws_s3_storage_key')
         lines = open(path).readlines()
         args = {}
         manager = None
-        
-        #TODO alterar arquivo schedules para formato json 
+
+        #TODO alterar arquivo schedules para formato json ?
         for line in lines:
             for key in expected_args:
                 if line.startswith(key):
-                    args[key] = line.split(key, 1)[1].lstrip()
+                    args[key] = line.split(key, 1)[1].strip()
                 elif key not in args:
                     args[key] = ''
 
         if args['command']:
-            print '    loaded schedule %s with args %s'%(os.path.basename(name), args)
+            print '\n* Loaded schedule %s with args %s'%(os.path.basename(name), args)
 
             if args['manager']:
                 arg_manager = args['manager'].split()
@@ -105,20 +178,34 @@ class Backup:
                 manager_args = arg_manager[1:]
 
                 if manager_name:
-                    manager = self._get_manager_by_name(manager_name, manager_args)
+                    manager = self._get_manager_by_name(manager_name)
+
+            aws_s3_credential = self._get_credential_by_name(args['aws_s3_credential'])
 
         elif len(lines) > 0:
             print '    failed on load schedule %s (oops! where is my backup command ?)'%os.path.basename(name)
         else:
-            print "    failed on load schedule %s (oops! i'm empty ?)"%os.path.basename(name)
+            print "    failed on load schedule %s (oops! I'm empty ?)"%os.path.basename(name)
 
-        schedule = dict(name = name, command = args['command'], manager = manager, storage_path = args['storage_path'])
+        schedule = dict(name = name,
+                        command = args['command'],
+                        manager = manager,
+                        storage_path = args['storage_path'],
+                        aws_s3_credential = aws_s3_credential,
+                        aws_s3_bucket_name = args['aws_s3_bucket_name'],
+                        aws_s3_storage_key = args['aws_s3_storage_key']
+                        )
         schedule['args_helpers'] = self._get_args_helpers(schedule)
+
         return schedule
 
 
-    def _get_manager_by_name(self, name, args):
-        return Manager().load_manager(name, args)
+    def _get_manager_by_name(self, name):
+        return Manager().load(name)
+
+
+    def _get_credential_by_name(self, name):
+        return Credential().load(name) if name else None
 
 
     def backup(self, name):
@@ -134,16 +221,23 @@ class Backup:
             args = shlex.split(schedule['command']%schedule['args_helpers'])
             self._create_dir_if_not_exists(schedule['args_helpers']['storage_path'])
 
+            print "\n*  Executing backup with command: %s\n"%" ".join(args)
             subprocess.Popen(args).communicate()
             #return subprocess.check_output(args, stderr = subprocess.STDOUT)
-        
-            if schedule['manager'] and self._validate_backup(schedule):
+
+            valid_backup = self._validate_backup(schedule)
+
+            if valid_backup and schedule['aws_s3_credential']:
+              AmazonWebServicesS3(schedule['aws_s3_credential']).upload(schedule)
+
+            #TODO replace manager by email_settings in schedules?
+            if valid_backup and schedule['manager']:
                 schedule['manager'].on_success(schedule)
             elif schedule['manager']:
                 schedule['manager'].on_fail(schedule)
 
-
     def _validate_backup(self, schedule):
+        # validates only existence of file with size > 0.
         return os.path.exists(schedule['args_helpers']['file']) and os.path.getsize(schedule['args_helpers']['file']) > 0
 
 
@@ -167,7 +261,7 @@ if __name__ == '__main__':
     import sys
     args_description = (
         ('postgresql', 'realiza backup de uma base dados postgresql'),
-        ('help', 'lista  os comandos disponiveis'), 
+        ('help', 'lista  os comandos disponiveis'),
         ('list', 'lista schedules e managers disponiveis conforme tipo informado')
     )
     expected_args = ('postgresql', 'list', 'help')
@@ -175,7 +269,7 @@ if __name__ == '__main__':
     def print_help():
         print 'Usage: backup.py <command>'
         print '\nCommandos disponiveis:'
-        for a in args_description: 
+        for a in args_description:
             print '    %s - %s'%(a[0], a[1])
 
     def backup(args):
