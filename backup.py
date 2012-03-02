@@ -20,6 +20,28 @@ along with pgbackup.  If not, see <http://www.gnu.org/licenses/>.
 import os.path, shlex, subprocess, json
 from time import strftime
 
+class Logger:
+
+    logs_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
+    log_path = os.path.join(logs_path, strftime("%Y-%m-%d"))
+
+    @classmethod
+    def write(cls, msg, new_lines = 2):
+        msg = "%s%s"%("\n" * new_lines, msg)
+
+        print msg
+        try:
+            if not os.path.exists(cls.logs_path):
+                os.makedirs(cls.logs_path)
+
+            log_file = file(cls.log_path, 'a')
+            log_file.write(msg)
+        except Exception as detail:
+            print "Oops! Could not write the log in file %s, details: %s"%(cls.log_path, detail)
+        finally:
+            log_file.close()
+
+
 class AmazonWebServicesS3:
     def __init__(self, credentials = {}):
         self.access_key = credentials.get('aws_s3_access_key')
@@ -33,14 +55,14 @@ class AmazonWebServicesS3:
         local_file_path  = schedule['args_helpers']['file']
         remote_file_path = os.path.join(schedule['aws_s3_storage_key'], os.path.basename(local_file_path))
 
-        print "\n* Uploading %s to aws s3 bucket: '%s', key: '%s'."%(local_file_path, schedule['aws_s3_bucket_name'], remote_file_path)
+        Logger.write("* Uploading %s to aws s3 bucket: '%s', key: '%s'."%(local_file_path, schedule['aws_s3_bucket_name'], remote_file_path))
         connection = S3Connection(self.access_key, self.secret_key)
         bucket = connection.get_bucket(schedule['aws_s3_bucket_name'])
 
         remote_file = Key(bucket)
         remote_file.key = remote_file_path
         remote_file.set_contents_from_filename(local_file_path)
-        print "\n    Yep, file uploaded."
+        Logger.write("    Yep, file uploaded.")
         return True
 
 
@@ -56,7 +78,7 @@ class Settings:
 
     def validates_existence_of(self, name):
         if not os.path.exists(self.get_path_for(name)):
-            print '    %s not exists in path "%s" :('%(self.settings_type, name)
+            Logger.write('    %s not exists in path "%s" :('%(self.settings_type, name))
             return False
         return True
 
@@ -80,7 +102,7 @@ class Credential(Settings):
 
 
     def _load(self, name):
-        print "\n* Loaded credential %s"%name
+        Logger.write("* Loaded credential %s"%name)
         expected_args = ('aws_s3_access_key', 'aws_s3_secret_key')
 
         lines = open(self.get_path_for(name)).readlines()
@@ -103,22 +125,18 @@ class Manager(Settings):
 
 
     def execute_commands(self, commands, schedule):
-        def now():
-            return strftime("%H:%M:%S-%Y-%m-%d")
-        logs = ''
-        logs += '\n* Started commands (at %s):'%now()
-        logs += '\n    %s\n\n    results:\n'%('\n    '.join(commands)%schedule['args_helpers'])
-        for command in commands:
-            args = (command%schedule['args_helpers']).encode('utf8')
-            #subprocess.Popen(shlex.split(args)).communicate()
-            try:
-                result = subprocess.check_output(shlex.split(args), stderr=subprocess.STDOUT)
-                logs += ('    %s'%result) if result else ''
-            except Exception as e:
-                logs+= '\n** Oops! errors ocurred on command "%s":\n        python traceback: %s\n        OS traceback: %s\n'%(args, e, e.output if 'output' in e.__dict__ else '')
-        logs += '\n    Finalized commands at %s'%now()
+        Logger.write('* Started managers commands')
 
-        print logs
+        for command in commands:
+            args = (command % schedule['args_helpers']).encode('utf8')
+            try:
+                Logger.write('    Executing: %s'%args, 0)
+                Logger.write('    %s'%(subprocess.check_output(shlex.split(args), stderr=subprocess.STDOUT) or ''), 0)
+            except Exception as e:
+                Logger.write('** Oops! errors ocurred :(\n        python traceback: %s\n        OS traceback: %s\n'%(args, e, e.output if 'output' in e.__dict__ else ''), 0)
+
+        Logger.write('    Finalized commands', 1)
+
 
     def send_emails(self, emails, commands, commands_logs):
         print '\n* #TODO implementar metodo send_emails: %s'%emails
@@ -170,7 +188,7 @@ class Backup:
                     args[key] = ''
 
         if args['command']:
-            print '\n* Loaded schedule %s with args %s'%(os.path.basename(name), args)
+            Logger.write('* Loaded schedule %s with args %s'%(os.path.basename(name), args))
 
             if args['manager']:
                 arg_manager = args['manager'].split()
@@ -183,9 +201,9 @@ class Backup:
             aws_s3_credential = self._get_credential_by_name(args['aws_s3_credential'])
 
         elif len(lines) > 0:
-            print '    failed on load schedule %s (oops! where is my backup command ?)'%os.path.basename(name)
+            Logger.write('    failed on load schedule %s (oops! where is my backup command ?)'%os.path.basename(name))
         else:
-            print "    failed on load schedule %s (oops! I'm empty ?)"%os.path.basename(name)
+            Logger.write("    failed on load schedule %s (oops! I'm empty ?)"%os.path.basename(name))
 
         schedule = dict(name = name,
                         command = args['command'],
@@ -209,19 +227,20 @@ class Backup:
 
 
     def backup(self, name):
-        schedule = self._load_schedule(name)
+        Logger.write("Starting backup for schedule %s"%name)
 
+        schedule = self._load_schedule(name)
         if not schedule:
-            print '    * backup of schedule "%s" aborted, invalid schedule :('%name
+            Logger.write('    * backup of schedule "%s" aborted, invalid schedule :('%name)
 
         elif not schedule.get('command', ''):
-            print '    * backup of schedule "%s" aborted, I need a argument called "command" to backup it duuu :P'%name
+            Logger.write('    * backup of schedule "%s" aborted, I need a argument called "command" to backup it duuu :P'%name)
 
         else:
             args = shlex.split(schedule['command']%schedule['args_helpers'])
             self._create_dir_if_not_exists(schedule['args_helpers']['storage_path'])
 
-            print "\n*  Executing backup with command: %s\n"%" ".join(args)
+            Logger.write("*  Executing backup with command: %s\n"%" ".join(args))
             subprocess.Popen(args).communicate()
             #return subprocess.check_output(args, stderr = subprocess.STDOUT)
 
@@ -272,12 +291,18 @@ if __name__ == '__main__':
         for a in args_description:
             print '    %s - %s'%(a[0], a[1])
 
+
     def backup(args):
         if len(args) < 2:
             print 'Pass the name of one or more schedules'
         b = Backup()
         for a in args[1:]:
-            b.backup(a)
+            try:
+                b.backup(a)
+            except Exception as detail:
+                print "Oops! Some error has occurred. Errors logged."
+                Logger.write(detail)
+  
 
     def list_schelules_and_managers():
         raise NotImplementedError
