@@ -17,8 +17,13 @@ You should have received a copy of the GNU General Public License
 along with pgbackup.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-import os.path, shlex, subprocess, json
+import os.path, shlex, subprocess, json, traceback
 from time import strftime
+
+
+class MsgError(Exception):
+    pass
+
 
 class Logger:
 
@@ -90,8 +95,8 @@ class Settings:
 
     def validates_existence_of(self, name):
         if not os.path.exists(self.get_path_for(name)):
-            Logger.write('    %s not exists in path "%s" :('%(self.settings_type, name))
-            return False
+            raise MsgError('no %s present with name "%s" :('%(self.settings_type, name))
+
         return True
 
 
@@ -129,7 +134,7 @@ class Credential(Settings):
 
         return args
 
-
+# TODO change manager to events, eg: before_backup, after_backup, on_upload_success, on_upload_fail
 class Manager(Settings):
 
     def __init__(self):
@@ -164,13 +169,12 @@ class Manager(Settings):
 
 
     def load(self, name):
-        if self.validates_existence_of(name):
-            self.events = json.loads(open(self.get_path_for(name)).read())
-            return self
-        else:
-            return False
+        self.validates_existence_of(name)
+        self.events = json.loads(open(self.get_path_for(name)).read())
 
-#TODO herdar classe Settings
+        return self
+
+#TODO extend class Settings
 class Backup:
 
     def __init__(self):
@@ -179,58 +183,103 @@ class Backup:
         }
 
 
-    def _load_schedule(self, name):
+    def backup(self, name, options = []):
+        Logger.write("Starting backup for schedule '%s' with options %s"%(name, options))
 
+        schedule = self._load_schedule(name, options)
+        args     = shlex.split(schedule['command']%schedule['args_helpers'])
+
+        self._create_dir_if_not_exists(schedule['args_helpers']['storage_path'])
+
+        Logger.write("*  Executing backup with command: %s\n"%" ".join(args))
+
+        subprocess.Popen(args).communicate()
+        valid_backup = self._validate_backup(schedule)
+
+        if valid_backup and schedule['aws_s3_credential']:
+            AmazonWebServicesS3(schedule['aws_s3_credential']).upload(schedule)
+
+            if schedule['manager']:
+                schedule['manager'].on_success(schedule)
+
+        elif schedule['manager']:
+            schedule['manager'].on_fail(schedule)
+
+
+    # TODO alterar arquivo schedules para formato json ?
+    def _load_schedule(self, name, options = []):
         path = os.path.join(self.paths['schedules'], name)
+
         if not os.path.exists(path):
-            print '    failed on load schedule "%s" file not exists :('%name
-            return False
+            raise MsgError('failed on load schedule "%s" file not exists :('%name)
 
-        expected_args = ('command', 'manager', 'storage_path', 'aws_s3_credential', 'aws_s3_bucket_name', 'aws_s3_storage_key')
-        lines = open(path).readlines()
-        args = {}
-        manager = None
+        # setup default vars
 
-        #TODO alterar arquivo schedules para formato json ?
+        loaded_args   = {}
+        expected_args = {
+            'optional' : ('manager',),
+            'required' : ('command', 'storage_path', 'aws_s3_credential', 'aws_s3_bucket_name', 'aws_s3_storage_key')
+        }
+
+        expected_args['all'] = expected_args['optional'] + expected_args['required']
+        manager              = None
+        lines                = open(path).readlines() + options
+
+
+        # read args from each line
+
         for line in lines:
-            for key in expected_args:
-                if line.startswith(key):
-                    args[key] = line.split(key, 1)[1].strip()
-                elif key not in args:
-                    args[key] = ''
+            for arg_name in expected_args['all']:
+                if line.startswith(arg_name):
+                    arg_value             = line.split(arg_name, 1)[1].strip()
+                    loaded_args[arg_name] = arg_value
 
-        if args['command']:
-            Logger.write('* Loaded schedule %s with args %s'%(os.path.basename(name), args))
 
-            if args['manager']:
-                arg_manager = args['manager'].split()
-                manager_name = arg_manager[0]
-                manager_args = arg_manager[1:]
+        # validates required args
 
-                if manager_name:
-                    manager = self._get_manager_by_name(manager_name)
+        not_present_args = set(expected_args['required']) - set(loaded_args)
 
-            aws_s3_credential = self._get_credential_by_name(args['aws_s3_credential'])
+        if not_present_args:
+            error_msg = (
+                "the args %s are required, but they aren't present in schedule either in received command line options,\n" +
+                "please define this args in the schedule or send via command line with syntax -OargName=argValue"
+            )%list(not_present_args)
 
-        elif len(lines) > 0:
-            Logger.write('    failed on load schedule %s (oops! where is my backup command ?)'%os.path.basename(name))
-        else:
-            Logger.write("    failed on load schedule %s (oops! I'm empty ?)"%os.path.basename(name))
+            raise MsgError(error_msg)
 
-        schedule = dict(name = name,
-                        command = args['command'],
-                        manager = manager,
-                        storage_path = args['storage_path'],
-                        aws_s3_credential = aws_s3_credential,
-                        aws_s3_bucket_name = args['aws_s3_bucket_name'],
-                        aws_s3_storage_key = args['aws_s3_storage_key']
-                        )
+        Logger.write("* Loaded schedule '%s' with args %s"%(os.path.basename(name), loaded_args))
+
+
+        # load manager if a manager name was defined in the schedule
+
+        if 'manager' in loaded_args:
+            manager_arg  = loaded_args['manager'].split()
+            manager      = self._get_manager_by_name(name = manager_arg[0], args = manager_arg[1:])
+
+
+        # load credentials
+
+        aws_s3_credential = self._get_credential_by_name(loaded_args['aws_s3_credential'])
+
+
+        # setup schedule with args loaded and return it
+
+        schedule = dict(
+            name               = name,
+            command            = loaded_args['command'],
+            manager            = manager,
+            storage_path       = loaded_args['storage_path'],
+            aws_s3_credential  = aws_s3_credential,
+            aws_s3_bucket_name = loaded_args['aws_s3_bucket_name'],
+            aws_s3_storage_key = loaded_args['aws_s3_storage_key']
+        )
+
         schedule['args_helpers'] = self._get_args_helpers(schedule)
 
         return schedule
 
 
-    def _get_manager_by_name(self, name):
+    def _get_manager_by_name(self, name, args = []):
         return Manager().load(name)
 
 
@@ -238,37 +287,8 @@ class Backup:
         return Credential().load(name) if name else None
 
 
-    def backup(self, name):
-        Logger.write("Starting backup for schedule %s"%name)
-
-        schedule = self._load_schedule(name)
-        if not schedule:
-            Logger.write('    * backup of schedule "%s" aborted, invalid schedule :('%name)
-
-        elif not schedule.get('command', ''):
-            Logger.write('    * backup of schedule "%s" aborted, I need a argument called "command" to backup it duuu :P'%name)
-
-        else:
-            args = shlex.split(schedule['command']%schedule['args_helpers'])
-            self._create_dir_if_not_exists(schedule['args_helpers']['storage_path'])
-
-            Logger.write("*  Executing backup with command: %s\n"%" ".join(args))
-            subprocess.Popen(args).communicate()
-            #return subprocess.check_output(args, stderr = subprocess.STDOUT)
-
-            valid_backup = self._validate_backup(schedule)
-
-            if valid_backup and schedule['aws_s3_credential']:
-              AmazonWebServicesS3(schedule['aws_s3_credential']).upload(schedule)
-
-            #TODO replace manager by email_settings in schedules?
-            if valid_backup and schedule['manager']:
-                schedule['manager'].on_success(schedule)
-            elif schedule['manager']:
-                schedule['manager'].on_fail(schedule)
-
     def _validate_backup(self, schedule):
-        # validates only existence of file with size > 0.
+        # it validates only if the file size is more than 0, the format of the file isn't validated.
         return os.path.exists(schedule['args_helpers']['file']) and os.path.getsize(schedule['args_helpers']['file']) > 0
 
 
@@ -280,16 +300,18 @@ class Backup:
 
         args.update({'file_basename' : '%s_%s.backup'%(schedule.get('name', ''), args['now'])})
         args.update({'file' : os.path.join(args['storage_path'], args['file_basename'])})
+
         return args
 
 
     def _create_dir_if_not_exists(self, path):
         if not os.path.exists(path):
             return os.makedirs(path)
-        return True
+
 
 if __name__ == '__main__':
     import sys
+
     args_description = (
         ('postgresql', 'realiza backup de uma base dados postgresql'),
         ('help', 'lista  os comandos disponiveis'),
@@ -297,27 +319,44 @@ if __name__ == '__main__':
     )
     expected_args = ('postgresql', 'list', 'help')
 
+
     def print_help():
-        print 'Usage: backup.py <command>'
+        print 'Usage: backup.py <command> [-OargName=argValue -OargName2=argValue2]'
         print '\nCommandos disponiveis:'
         for a in args_description:
             print '    %s - %s'%(a[0], a[1])
 
 
     def backup(args):
+        schedule_names = []
+        options        = []
+
         if len(args) < 2:
             print 'Pass the name of one or more schedules'
+
         b = Backup()
-        for a in args[1:]:
+
+        for arg in args[1:]:
+            if arg.startswith('-O'):
+                options.append(arg[2:].replace('=', ' '))
+            else:
+                schedule_names.append(arg)
+
+        for schedule_name in schedule_names:
             try:
-                b.backup(a)
+                b.backup(schedule_name, options)
+
+            except MsgError as msg:
+                Logger.write('** Error: %s\n'%msg, 1)
+
             except Exception as detail:
-                print "Oops! Some error has occurred. Errors logged."
-                Logger.write(detail)
+                Logger.write("** Oops! Some error ocurred: %s\n"%detail, 1)
+                traceback.print_exc()
 
 
     def list_schelules_and_managers():
         raise NotImplementedError
+
 
     if len(sys.argv) < 2:
         print_help()
