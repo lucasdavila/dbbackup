@@ -26,23 +26,23 @@ class MsgError(Exception):
 
 
 class Logger:
-
-    logs_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
-    log_path = os.path.join(logs_path, strftime("%Y-%m-%d"))
+    logs_root_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
+    log_path       = os.path.join(logs_root_path, 'log.log')
 
     @classmethod
-    def write(cls, msg, new_lines = 2):
-        msg = "%s%s"%("\n" * new_lines, msg)
-
+    def log(cls, msg):
         print msg
+
         try:
-            if not os.path.exists(cls.logs_path):
-                os.makedirs(cls.logs_path)
+            if not os.path.exists(cls.logs_root_path):
+                os.makedirs(cls.logs_root_path)
 
             log_file = file(cls.log_path, 'a')
             log_file.write(msg)
+
         except Exception as detail:
-            print "Oops! Could not write the log in file %s, details: %s"%(cls.log_path, detail)
+            print "\nOops! Couldn't write the log in file %s, details: %s"%(cls.log_path, detail)
+
         finally:
             log_file.close()
 
@@ -63,7 +63,7 @@ class AmazonWebServicesS3:
         connection       = S3Connection(self.access_key, self.secret_key)
         s3_uri           = "%s://%s:%s%s"%(connection.protocol, connection.host, connection.port, connection.get_path())
 
-        Logger.write("* Uploading %s to aws s3 bucket: '%s', key: '%s', Uri: '%s'."%(local_file_path,
+        Logger.log("\n* Uploading %s to aws s3 bucket: '%s', key: '%s', Uri: '%s'."%(local_file_path,
                      schedule['aws_s3_bucket_name'], remote_file_path, s3_uri))
 
         bucket = connection.get_bucket(schedule['aws_s3_bucket_name'])
@@ -75,9 +75,9 @@ class AmazonWebServicesS3:
         remote_file_exists = remote_file.exists()
 
         if remote_file_exists:
-          Logger.write("    Yep, backup uploaded to S3.")
+          Logger.log("\nYep, backup uploaded to S3.\n")
         else:
-          Logger.write("    Oops!, backup not uploaded to S3.")
+          Logger.log("\nOops!, backup not uploaded to S3.\n")
 
         connection.close()
         return remote_file_exists
@@ -119,7 +119,7 @@ class Credential(Settings):
 
 
     def _load(self, name):
-        Logger.write("* Loaded credential %s"%name)
+        Logger.log("\n* Loaded credential %s"%name)
         expected_args = ('aws_s3_access_key', 'aws_s3_secret_key')
 
         lines = open(self.get_path_for(name)).readlines()
@@ -142,17 +142,17 @@ class Manager(Settings):
 
 
     def execute_commands(self, commands, schedule):
-        Logger.write('* Started managers commands')
+        Logger.log('\n* Started managers commands')
 
         for command in commands:
             args = (command % schedule['args_helpers']).encode('utf8')
             try:
-                Logger.write('    Executing: %s'%args, 0)
-                Logger.write('    %s'%(subprocess.check_output(shlex.split(args), stderr=subprocess.STDOUT) or ''), 0)
+                Logger.log('\n    Executing: %s'%args)
+                Logger.log('    %s'%(subprocess.check_output(shlex.split(args), stderr=subprocess.STDOUT) or ''))
             except Exception as e:
-                Logger.write('** Oops! errors ocurred :(\n        python traceback: %s\n        OS traceback: %s\n'%(args, e, e.output if 'output' in e.__dict__ else ''), 0)
+                Logger.log('\n** Oops! errors ocurred :(\n        python traceback: %s\n        OS traceback: %s\n'%(args, e, e.output if 'output' in e.__dict__ else ''))
 
-        Logger.write('    Finalized commands', 1)
+        Logger.log('\n    Finalized commands')
 
 
     def send_emails(self, emails, commands, commands_logs):
@@ -184,14 +184,14 @@ class Backup:
 
 
     def backup(self, name, options = []):
-        Logger.write("Starting backup for schedule '%s' with options %s"%(name, options))
+        Logger.log("\n\n[%s] Starting backup for schedule '%s' with options %s"%(strftime("%H:%M:%S %Y-%m-%d"), name, options))
 
         schedule = self._load_schedule(name, options)
         args     = shlex.split(schedule['command']%schedule['args_helpers'])
 
         self._create_dir_if_not_exists(schedule['args_helpers']['storage_path'])
 
-        Logger.write("*  Executing backup with command: %s\n"%" ".join(args))
+        Logger.log("\n*  Executing backup with command: %s"%" ".join(args))
 
         subprocess.Popen(args).communicate()
         valid_backup = self._validate_backup(schedule)
@@ -247,7 +247,7 @@ class Backup:
 
             raise MsgError(error_msg)
 
-        Logger.write("* Loaded schedule '%s' with args %s"%(os.path.basename(name), loaded_args))
+        Logger.log("\n* Loaded schedule '%s' with args %s"%(os.path.basename(name), loaded_args))
 
 
         # load manager if a manager name was defined in the schedule
@@ -347,10 +347,10 @@ if __name__ == '__main__':
                 b.backup(schedule_name, options)
 
             except MsgError as msg:
-                Logger.write('** Error: %s\n'%msg, 1)
+                Logger.log('** Error: %s\n'%msg)
 
             except Exception as detail:
-                Logger.write("** Oops! Some error ocurred: %s\n"%detail, 1)
+                Logger.log("** Oops! Some error ocurred: %s\n"%detail)
                 traceback.print_exc()
 
 

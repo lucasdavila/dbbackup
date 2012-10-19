@@ -1,0 +1,6 @@
+"logs/log.log" {
+  rotate 7
+  daily
+  copy
+  #mail lucassdvl@gmail.com
+}
