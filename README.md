@@ -20,11 +20,11 @@ pgbackup is a simple backup manager for postgresql that allows easy uploading to
 
 # the options below also can be passed via command line when the script backup.py is called (see step 5).
 
-storage_path /home/lucasdavila/pg_backups
+storage_path /home/lucasdavila/pg_backups/%(year)s/%(month)s
 
 aws_s3_credential aws_s3_credential
 aws_s3_bucket_name your-bucket-name
-aws_s3_storage_key your/remote/path/to/upload</pre>
+aws_s3_storage_key your/remote/path/to/upload/%(year)s/%(month)s</pre>
 
 
 **4. define your aws credentials in _/schedules/aws_s3_credential_:**

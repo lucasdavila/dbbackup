@@ -58,7 +58,7 @@ class AmazonWebServicesS3:
         from boto.s3.key import Key
 
         local_file_path  = schedule['args_helpers']['file']
-        remote_file_path = os.path.join(schedule['aws_s3_storage_key'], os.path.basename(local_file_path))
+        remote_file_path = os.path.join(schedule['aws_s3_storage_key']%schedule['args_helpers'], os.path.basename(local_file_path))
 
         connection       = S3Connection(self.access_key, self.secret_key)
         s3_uri           = "%s://%s:%s%s"%(connection.protocol, connection.host, connection.port, connection.get_path())
@@ -231,12 +231,15 @@ class Backup:
 
     def _get_args_helpers(self, schedule):
         args = {
-            'now' : strftime("%H-%M-%S_%Y-%m-%d"),
-            'storage_path' : schedule.get('storage_path', '').strip()
+            'now'   : strftime("%H-%M-%S_%Y-%m-%d"),
+            'day'   : strftime("%d"),
+            'month' : strftime("%m"),
+            'year'  : strftime("%Y")
         }
 
-        args.update({'file_basename' : '%s_%s.backup'%(schedule.get('name', ''), args['now'])})
-        args.update({'file' : os.path.join(args['storage_path'], args['file_basename'])})
+        args['file_basename'] = '%s_%s.backup'%(schedule.get('name', ''), args['now'])
+        args['storage_path']  = schedule.get('storage_path', '').strip()%args
+        args['file']          = os.path.join(args['storage_path'], args['file_basename'])
 
         return args
 
