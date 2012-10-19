@@ -134,45 +134,6 @@ class Credential(Settings):
 
         return args
 
-# TODO change manager to events, eg: before_backup, after_backup, on_upload_success, on_upload_fail
-class Manager(Settings):
-
-    def __init__(self):
-        Settings.__init__(self, 'managers')
-
-
-    def execute_commands(self, commands, schedule):
-        Logger.log('\n* Started managers commands')
-
-        for command in commands:
-            args = (command % schedule['args_helpers']).encode('utf8')
-            try:
-                Logger.log('\n    Executing: %s'%args)
-                Logger.log('    %s'%(subprocess.check_output(shlex.split(args), stderr=subprocess.STDOUT) or ''))
-            except Exception as e:
-                Logger.log('\n** Oops! errors ocurred :(\n        python traceback: %s\n        OS traceback: %s\n'%(args, e, e.output if 'output' in e.__dict__ else ''))
-
-        Logger.log('\n    Finalized commands')
-
-
-    def send_emails(self, emails, commands, commands_logs):
-        print '\n* #TODO implementar metodo send_emails: %s'%emails
-
-
-    def on_success(self, schedule):
-        commands_logs = self.execute_commands(self.events['on_success']['commands'], schedule = schedule)
-        self.send_emails(self.events['on_success']['send_emails_to'], commands = self.events['on_success']['commands'], commands_logs = commands_logs)
-
-
-    def on_fail(self, schedule):
-        raise NotImplementedError
-
-
-    def load(self, name):
-        self.validates_existence_of(name)
-        self.events = json.loads(open(self.get_path_for(name)).read())
-
-        return self
 
 #TODO extend class Settings
 class Backup:
@@ -199,12 +160,6 @@ class Backup:
         if valid_backup and schedule['aws_s3_credential']:
             AmazonWebServicesS3(schedule['aws_s3_credential']).upload(schedule)
 
-            if schedule['manager']:
-                schedule['manager'].on_success(schedule)
-
-        elif schedule['manager']:
-            schedule['manager'].on_fail(schedule)
-
 
     # TODO alterar arquivo schedules para formato json ?
     def _load_schedule(self, name, options = []):
@@ -215,21 +170,15 @@ class Backup:
 
         # setup default vars
 
+        required_args = ('command', 'storage_path', 'aws_s3_credential', 'aws_s3_bucket_name', 'aws_s3_storage_key')
         loaded_args   = {}
-        expected_args = {
-            'optional' : ('manager',),
-            'required' : ('command', 'storage_path', 'aws_s3_credential', 'aws_s3_bucket_name', 'aws_s3_storage_key')
-        }
 
-        expected_args['all'] = expected_args['optional'] + expected_args['required']
-        manager              = None
-        lines                = open(path).readlines() + options
-
+        lines         = open(path).readlines() + options
 
         # read args from each line
 
         for line in lines:
-            for arg_name in expected_args['all']:
+            for arg_name in required_args:
                 if line.startswith(arg_name):
                     arg_value             = line.split(arg_name, 1)[1].strip()
                     loaded_args[arg_name] = arg_value
@@ -237,7 +186,7 @@ class Backup:
 
         # validates required args
 
-        not_present_args = set(expected_args['required']) - set(loaded_args)
+        not_present_args = set(required_args) - set(loaded_args)
 
         if not_present_args:
             error_msg = (
@@ -250,13 +199,6 @@ class Backup:
         Logger.log("\n* Loaded schedule '%s' with args %s"%(os.path.basename(name), loaded_args))
 
 
-        # load manager if a manager name was defined in the schedule
-
-        if 'manager' in loaded_args:
-            manager_arg  = loaded_args['manager'].split()
-            manager      = self._get_manager_by_name(name = manager_arg[0], args = manager_arg[1:])
-
-
         # load credentials
 
         aws_s3_credential = self._get_credential_by_name(loaded_args['aws_s3_credential'])
@@ -267,7 +209,6 @@ class Backup:
         schedule = dict(
             name               = name,
             command            = loaded_args['command'],
-            manager            = manager,
             storage_path       = loaded_args['storage_path'],
             aws_s3_credential  = aws_s3_credential,
             aws_s3_bucket_name = loaded_args['aws_s3_bucket_name'],
@@ -277,10 +218,6 @@ class Backup:
         schedule['args_helpers'] = self._get_args_helpers(schedule)
 
         return schedule
-
-
-    def _get_manager_by_name(self, name, args = []):
-        return Manager().load(name)
 
 
     def _get_credential_by_name(self, name):
@@ -315,7 +252,7 @@ if __name__ == '__main__':
     args_description = (
         ('postgresql', 'realiza backup de uma base dados postgresql'),
         ('help', 'lista  os comandos disponiveis'),
-        ('list', 'lista schedules e managers disponiveis conforme tipo informado')
+        ('list', 'lista schedules disponiveis conforme tipo informado')
     )
     expected_args = ('postgresql', 'list', 'help')
 
@@ -354,7 +291,7 @@ if __name__ == '__main__':
                 traceback.print_exc()
 
 
-    def list_schelules_and_managers():
+    def list_schedules():
         raise NotImplementedError
 
 
@@ -366,6 +303,6 @@ if __name__ == '__main__':
     elif sys.argv[1] == 'help':
         print_help()
     elif sys.argv[1] == 'list':
-        list_schelules_and_managers()
+        list_schedules()
     elif sys.argv[1] == 'postgresql':
         backup(sys.argv[1:])
