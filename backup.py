@@ -55,15 +55,27 @@ class AmazonWebServicesS3:
         local_file_path  = schedule['args_helpers']['file']
         remote_file_path = os.path.join(schedule['aws_s3_storage_key'], os.path.basename(local_file_path))
 
-        Logger.write("* Uploading %s to aws s3 bucket: '%s', key: '%s'."%(local_file_path, schedule['aws_s3_bucket_name'], remote_file_path))
-        connection = S3Connection(self.access_key, self.secret_key)
+        connection       = S3Connection(self.access_key, self.secret_key)
+        s3_uri           = "%s://%s:%s%s"%(connection.protocol, connection.host, connection.port, connection.get_path())
+
+        Logger.write("* Uploading %s to aws s3 bucket: '%s', key: '%s', Uri: '%s'."%(local_file_path,
+                     schedule['aws_s3_bucket_name'], remote_file_path, s3_uri))
+
         bucket = connection.get_bucket(schedule['aws_s3_bucket_name'])
 
-        remote_file = Key(bucket)
+        remote_file     = Key(bucket)
         remote_file.key = remote_file_path
+
         remote_file.set_contents_from_filename(local_file_path)
-        Logger.write("    Yep, file uploaded.")
-        return True
+        remote_file_exists = remote_file.exists()
+
+        if remote_file_exists:
+          Logger.write("    Yep, backup uploaded to S3.")
+        else:
+          Logger.write("    Oops!, backup not uploaded to S3.")
+
+        connection.close()
+        return remote_file_exists
 
 
 class Settings:
@@ -302,7 +314,7 @@ if __name__ == '__main__':
             except Exception as detail:
                 print "Oops! Some error has occurred. Errors logged."
                 Logger.write(detail)
-  
+
 
     def list_schelules_and_managers():
         raise NotImplementedError
