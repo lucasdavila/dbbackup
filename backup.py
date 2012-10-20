@@ -231,7 +231,7 @@ class Backup:
 
     def _get_args_helpers(self, schedule):
         args = {
-            'now'   : strftime("%H-%M-%S_%Y-%m-%d"),
+            'now'   : strftime("%Y-%m-%d_%H-%M-%S"),
             'day'   : strftime("%d"),
             'month' : strftime("%m"),
             'year'  : strftime("%Y")
