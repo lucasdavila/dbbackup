@@ -71,7 +71,7 @@ class AmazonWebServicesS3:
         remote_file     = Key(bucket)
         remote_file.key = remote_file_path
 
-        remote_file.set_contents_from_filename(local_file_path)
+        remote_file.set_contents_from_filename(filename = local_file_path, reduced_redundancy = True)
         remote_file_exists = remote_file.exists()
 
         if remote_file_exists:

@@ -1,0 +1,50 @@
+# TODO
+
+ver como ler um arquivo aos poucos, conforme "xx" MB de tamanho, ex:
+
+
+  testar com um arquivo de texto (123456789abcdefghijklmnopqrstuvwxyz)
+  testar se inicio de um arquivo continua o fim de outro
+
+
+# parts = arquivo / em x parts de yy MB
+
+size = tamanho_em_bytes_de_cada_parte
+
+for part in parts:
+  fp = open(backup_path, 'rb')
+
+  fp.seek(size * (part - 1)) # move cursor atual do arquivo para xx bytes depois do inicio do arquivo
+  data = fp.read(size)       # le x bytes do arquivo (apartir da posição atual do cursor
+
+  fp.close()
+
+  multi_upload.upload_part_from_file(StringIO(data), part)
+
+
+
+
+Em determinados backups ocorre o erro "[Errno 104] Connection reset by peer" segundo este post [1] o problema é causado pelas definiços no kernel linux, 
+
+O problema pode ser resolvido modificando kernel ou usando a funcionalidade multi-upload do s3, ex:
+
+bucket       = connection.get_bucket(schedule['aws_s3_bucket_name'])
+mb_size      = os.path.getsize(transfer_file) / 1e6
+multi_upload = bucket.initiate_multipart_upload('key_name', reduced_redundancy=True)
+
+# parts = arquivo / em x parts
+
+for part in parts:
+  fp = open('xaa', 'rb')
+  mp.upload_part_from_file(fp, 1)
+  fp.close()
+
+#for part in mp:
+#    print part.part_number, part.size
+
+mp.complete_upload()
+
+
+
+refs 
+  [1] http://scie.nti.st/2008/3/14/amazon-s3-and-connection-reset-by-peer
