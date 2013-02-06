@@ -1,4 +1,4 @@
-pgbackup is a simple backup manager for postgresql that allows easy uploading to [Amazon web services S3](http://aws.amazon.com/s3/).  
+pgbackup is a simple backup manager for postgresql that allows easy upload to [Amazon web services S3](http://aws.amazon.com/s3/).  
 
 # Step by step
 
@@ -18,7 +18,7 @@ pgbackup is a simple backup manager for postgresql that allows easy uploading to
 <pre>command /usr/bin/pg_dump --host localhost --port 5432 --username "postgres" --format custom --blobs --verbose
 --file "%(file)s" data-base-name
 
-# the options below also can be passed via command line when the script backup.py is called (see step 5).
+# the options below also can be passed via command line when the script backup.py is called (see step 5).  
 
 storage_path /home/lucasdavila/pg_backups/%(year)s/%(month)s
 
@@ -35,7 +35,10 @@ Remember: Your keys are private, don't add these files into your version control
 
 
 **5. add tasks to crontab, eg:**  
-```$ crontab -e```
+```$ crontab -e```  
+
+every day call logrotate to rotates pgbackup logs  
+```45 2 * * * cd /home/lucasdavila/projects/python/pgbackup; logrotate -s logs/logrotate_state logs/logrotate_config;```  
 
 every sunday at 2:50 AM the remain backups in server will be destroyed  
 ```50 2 * * 0 rm -r /home/lucasdavila/pg_backups/*.backup```
