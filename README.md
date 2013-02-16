@@ -15,7 +15,7 @@ pgbackup is a simple backup manager for postgresql that allows easy upload to [A
   
   
 **3. create your schedules in _/schedules/your_schedule_file_name_:**
-<pre>command /usr/bin/pg_dump --host localhost --port 5432 --username "postgres" --format custom --blobs --verbose
+<pre>command /usr/bin/pg_dump --no-password --host localhost --port 5432 --username "postgres" --format custom --blobs --verbose
 --file "%(file)s" data-base-name
 
 # the options below also can be passed via command line when the script backup.py is called (see step 5).  
@@ -32,10 +32,13 @@ aws_s3_storage_key your/remote/path/to/upload/%(year)s/%(month)s</pre>
 aws_s3_secret_key your-secret-key</pre>
 
 Remember: Your keys are private, don't add these files into your version control system.
-
-
+  
+  
 **5. add tasks to crontab, eg:**  
 ```$ crontab -e```  
+
+if your server require a password, you can define the postgres user password  
+```PGPASSWORD=123```  
 
 every day call logrotate to rotates pgbackup logs  
 ```45 2 * * * cd /home/lucasdavila/projects/python/pgbackup; logrotate -s logs/logrotate_state logs/logrotate_config;```  

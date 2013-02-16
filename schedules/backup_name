@@ -1,8 +1,6 @@
-command /usr/bin/pg_dump --host localhost --port 5432 --username "postgres" --format custom --blobs --verbose --file "%(file)s" postgres
+command /usr/bin/pg_dump --no-password --host localhost --port 5432 --username "postgres" --format custom --blobs --verbose --file "%(file)s" postgres
 
 storage_path /home/lucasdavila/pg_backups
-
-manager local_manager
 
 aws_s3_credential aws_s3_credential
 aws_s3_bucket_name your-bucket-name
