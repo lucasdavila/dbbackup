@@ -2,19 +2,19 @@
 """
 Copyright (c) 2011 Lucas D'Avila - email <lucassdvl@gmail.com> / twitter @lucadavila
 
-This file is part of pgbackup.
+This file is part of dbbackup.
 
-pgbackup is free software: you can redistribute it and/or modify
+dbbackup is free software: you can redistribute it and/or modify
 it under the terms of the GNU Lesser General Public License (LGPL v3) as published by
 the Free Software Foundation, on version 3 of the License.
 
-pgbackup is distributed in the hope that it will be useful,
+dbbackup is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with pgbackup.  If not, see <http://www.gnu.org/licenses/>.
+along with dbbackup.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 import os.path, shlex, subprocess, json, traceback
@@ -153,12 +153,24 @@ class Backup:
         self._create_dir_if_not_exists(schedule['args_helpers']['storage_path'])
 
         Logger.log("\n*  Executing backup with command: %s"%" ".join(args))
-
         subprocess.Popen(args).communicate()
+
+        self.after_run_backup_command(schedule)
+
         valid_backup = self._validate_backup(schedule)
 
         if valid_backup and schedule['aws_s3_credential']:
             AmazonWebServicesS3(schedule['aws_s3_credential']).upload(schedule)
+        elif not valid_backup:
+            Logger.log("\n*  Oops! The backup file %s isn't valid!"%schedule['args_helpers']['file'])
+
+
+    def after_run_backup_command(self, schedule):
+        pass
+
+
+    def _required_schedule_args(self):
+        return ['command', 'storage_path', 'aws_s3_credential', 'aws_s3_bucket_name', 'aws_s3_storage_key']
 
 
     # TODO alterar arquivo schedules para formato json ?
@@ -170,7 +182,7 @@ class Backup:
 
         # setup default vars
 
-        required_args = ('command', 'storage_path', 'aws_s3_credential', 'aws_s3_bucket_name', 'aws_s3_storage_key')
+        required_args = self._required_schedule_args()
         loaded_args   = {}
 
         lines         = open(path).readlines() + options
@@ -199,23 +211,15 @@ class Backup:
         Logger.log("\n* Loaded schedule '%s' with args %s"%(os.path.basename(name), loaded_args))
 
 
-        # load credentials
-
-        aws_s3_credential = self._get_credential_by_name(loaded_args['aws_s3_credential'])
-
-
         # setup schedule with args loaded and return it
 
         schedule = dict(
-            name               = name,
-            command            = loaded_args['command'],
-            storage_path       = loaded_args['storage_path'],
-            aws_s3_credential  = aws_s3_credential,
-            aws_s3_bucket_name = loaded_args['aws_s3_bucket_name'],
-            aws_s3_storage_key = loaded_args['aws_s3_storage_key']
+            name = name,
+            **loaded_args
         )
 
-        schedule['args_helpers'] = self._get_args_helpers(schedule)
+        schedule['aws_s3_credential'] = self._get_credential_by_name(loaded_args['aws_s3_credential'])
+        schedule['args_helpers']      = self._get_args_helpers(schedule)
 
         return schedule
 
@@ -249,15 +253,55 @@ class Backup:
             return os.makedirs(path)
 
 
+class MongoBackup(Backup):
+
+    def after_run_backup_command(self, schedule):
+        output_dir = os.path.join(schedule['args_helpers']['output_dir'], schedule['args_helpers']['db_name'])
+
+        if not os.path.exists(output_dir):
+            raise MsgError('Failed on compress backup, dir "%s" not exists :('%output_dir)
+
+        command    = "tar --create --verbose --gzip --file %s %s"%(
+            schedule['args_helpers']['file'],
+            output_dir
+        )
+
+        args = shlex.split(command)
+
+        Logger.log("\n*  Compressing backup with command: %s"%" ".join(args))
+        subprocess.Popen(args).communicate()
+
+
+    def _required_schedule_args(self):
+        required = Backup._required_schedule_args(self)
+        required.append('db_name')
+
+        return required
+
+
+    def _get_args_helpers(self, schedule):
+        args = Backup._get_args_helpers(self, schedule)
+
+        # overrides default args
+        args['file_basename'] = '%s_%s.tar.gz'%(schedule['db_name'], args['now'])
+        args['file']          = os.path.join(args['storage_path'], args['file_basename'])
+
+        # add specific mongodb args
+        args['db_name']    = schedule['db_name']
+        args['output_dir'] = args['storage_path']
+
+        return args
+
 if __name__ == '__main__':
     import sys
 
     args_description = (
         ('postgresql', 'realiza backup de uma base dados postgresql'),
+        ('mongodb', 'realiza backup de uma base dados mongodb'),
         ('help', 'lista  os comandos disponiveis'),
         ('list', 'lista schedules disponiveis conforme tipo informado')
     )
-    expected_args = ('postgresql', 'list', 'help')
+    expected_args = ('postgresql', 'mongodb', 'list', 'help')
 
 
     def print_help():
@@ -267,14 +311,14 @@ if __name__ == '__main__':
             print '    %s - %s'%(a[0], a[1])
 
 
-    def backup(args):
+    def backup(args, backup_class = Backup):
         schedule_names = []
         options        = []
 
         if len(args) < 2:
             print 'Pass the name of one or more schedules'
 
-        b = Backup()
+        b = backup_class()
 
         for arg in args[1:]:
             if arg.startswith('-O'):
@@ -300,12 +344,19 @@ if __name__ == '__main__':
 
     if len(sys.argv) < 2:
         print_help()
+
     elif sys.argv[1] not in expected_args:
         print 'Oops!, invalid command "%s"\n'%sys.argv[1]
         print_help()
+
     elif sys.argv[1] == 'help':
         print_help()
+
     elif sys.argv[1] == 'list':
         list_schedules()
+
     elif sys.argv[1] == 'postgresql':
         backup(sys.argv[1:])
+
+    elif sys.argv[1] == 'mongodb':
+        backup(sys.argv[1:], MongoBackup)

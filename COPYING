@@ -1,8 +1,8 @@
-#LICENSE pgbackup
+#LICENSE dbbackup
 
 Copyright (c) 2011 Lucas D'Avila - email <lucassdvl@gmail.com> / twitter @lucadavila
 
-pgbackup is Licensed under the LGPL license version 3 (http://www.gnu.org/licenses/lgpl.html)
+dbbackup is Licensed under the LGPL license version 3 (http://www.gnu.org/licenses/lgpl.html)
 
 #COPY OF THE GNU LGPL v3:
 

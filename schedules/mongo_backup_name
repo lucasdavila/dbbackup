@@ -1,0 +1,7 @@
+db_name your_database_name
+command /usr/bin/mongodump --host localhost --port 27017 --db "%(db_name)s" --verbose --out "%(output_dir)s"
+storage_path /home/lucasdavila/backups/database
+
+aws_s3_credential aws_s3_credential
+aws_s3_bucket_name your-bucket-name
+aws_s3_storage_key your/remote/path/to/upload/%(year)s/%(month)s
