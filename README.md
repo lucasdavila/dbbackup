@@ -8,10 +8,10 @@ dbbackup is a simple backup manager for postgresql that allows easy upload to [A
 ```$ cd dbbackup```  
   
   
-**2. Install pip and requiriments:**  
+**2. Install pip and requirements:**  
 ```$ sudo apt-get install python-dev build-essential python-pip```  
 ```$ sudo sudo pip install --upgrade pip```  
-```$ sudo pip install -r requiriments.txt```  
+```$ sudo pip install -r requirements.txt```  
   
   
 **3. create your schedules in _/schedules/your_schedule_file_name_:**

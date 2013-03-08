@@ -1,4 +1,0 @@
-# dependencies file, to install run $ sudo pip install -r requiriments.txt
-
-# aws library
-boto >= 2.2.2
